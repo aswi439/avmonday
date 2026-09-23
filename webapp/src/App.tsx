@@ -40,6 +40,7 @@ import { evaluateAlerts, loadAlertSettings } from "@/lib/alertsEngine";
 const AUTHORITY_PAGES: PageType[] = [
   "forecast-datas",
   "historic-data",
+  "atmospheric-dynamics",
   "transports",
   "industry-map",
 ];
@@ -72,10 +73,7 @@ export default function App() {
       }
       if (
         window.location.hash === "#atmospheric-dynamics" ||
-        window.location.hash === "#atmosphere" ||
-        window.location.hash === "#airlens" ||
-        window.location.hash === "#wrf-chem" ||
-        window.location.hash === "#coupled-model"
+        window.location.hash === "#atmosphere"
       ) {
         return "atmospheric-dynamics";
       }
@@ -141,10 +139,7 @@ export default function App() {
         setCurrentPage("historic-data");
       } else if (
         window.location.hash === "#atmospheric-dynamics" ||
-        window.location.hash === "#atmosphere" ||
-        window.location.hash === "#airlens" ||
-        window.location.hash === "#wrf-chem" ||
-        window.location.hash === "#coupled-model"
+        window.location.hash === "#atmosphere"
       ) {
         setCurrentPage("atmospheric-dynamics");
       } else if (
@@ -464,7 +459,7 @@ export default function App() {
         />
       ) : (
         <main ref={mainRef}>
-          {/* 1. Hero Section (AQI Value with Full Screen Video Background) */}
+          {/* 1. Hero Section (AQI Value with Live Sky Observation) */}
           <div id="forecast-hero">
             <Hero
               forecast={data.forecast}
@@ -482,17 +477,7 @@ export default function App() {
             />
           </div>
 
-          {/* 1.5. Live Pollutant Particle Breakdown - 3D Fanning Card Stack */}
-          <PollutantCardStackSection
-            cityAggregate={cityAggregate.data}
-            consensus={consensus.data}
-            hour={hour}
-            cursor={cursor.cursor}
-            weatherapi={realtime.weatherapi.data}
-            realtimeIqair={realtime.iqair.data}
-          />
-
-          {/* 2. Delhi NCR Live Condition */}
+          {/* 2. 72-Hour Consensus Prediction Box - Directly under AQI Box */}
           <div id="consensus-dashboard">
             <ConsensusDashboard
               data={consensus.data}
@@ -503,6 +488,16 @@ export default function App() {
               realtimeIqair={realtime.iqair.data}
             />
           </div>
+
+          {/* 2.5. Live Pollutant Particle Breakdown - 3D Fanning Card Stack */}
+          <PollutantCardStackSection
+            cityAggregate={cityAggregate.data}
+            consensus={consensus.data}
+            hour={hour}
+            cursor={cursor.cursor}
+            weatherapi={realtime.weatherapi.data}
+            realtimeIqair={realtime.iqair.data}
+          />
 
           {/* 2.5. Citizen Air Guide - 3 Plain-Language Breakdown Boxes */}
           <div id="citizen-pollution-breakdown">

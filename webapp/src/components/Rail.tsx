@@ -16,7 +16,6 @@ import {
   LogOut,
   KeyRound,
   X,
-  Cpu,
 } from "lucide-react";
 import { CircleMenu, type CircleMenuItem } from "@/components/ui/circle-menu";
 
@@ -375,56 +374,6 @@ export function Rail({
           >
             <Download size={12} style={{ color: isLight ? "#0284c7" : "var(--cyan)" }} />
             <span>{t("navigation.downloadReport") || "Download Report"}</span>
-          </button>
-        )}
-
-        {/* WRF-Chem Coupled Model Showcase Pill Button */}
-        {onPageChange && (
-          <button
-            type="button"
-            onClick={() => onPageChange("atmospheric-dynamics")}
-            title="Airlens WRF-Chem Coupled Weather-Chemistry Model Showcase"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.45rem",
-              height: "32px",
-              padding: "0 0.85rem",
-              background: currentPage === "atmospheric-dynamics"
-                ? (isLight ? "rgba(147, 51, 234, 0.16)" : "rgba(168, 85, 247, 0.22)")
-                : (isLight ? "rgba(255, 255, 255, 0.88)" : "rgba(12, 16, 26, 0.7)"),
-              border: `1px solid ${currentPage === "atmospheric-dynamics" ? (isLight ? "rgba(147, 51, 234, 0.5)" : "rgba(168, 85, 247, 0.55)") : (isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.16)")}`,
-              borderRadius: "9999px",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              color: currentPage === "atmospheric-dynamics" ? (isLight ? "#9333ea" : "#c084fc") : (isLight ? "#0f172a" : "rgba(255, 255, 255, 0.85)"),
-              fontFamily: "var(--mono)",
-              fontSize: "11px",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-              boxShadow: currentPage === "atmospheric-dynamics"
-                ? (isLight ? "0 0 12px rgba(147, 51, 234, 0.25)" : "0 0 12px rgba(168, 85, 247, 0.4)")
-                : (isLight ? "0 4px 12px rgba(15, 23, 42, 0.06)" : "0 4px 12px rgba(0,0,0,0.25)"),
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => {
-              if (currentPage !== "atmospheric-dynamics") {
-                e.currentTarget.style.borderColor = isLight ? "rgba(147, 51, 234, 0.45)" : "rgba(168, 85, 247, 0.45)";
-                e.currentTarget.style.background = isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(16, 22, 36, 0.85)";
-                e.currentTarget.style.color = isLight ? "#9333ea" : "#FFFFFF";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentPage !== "atmospheric-dynamics") {
-                e.currentTarget.style.borderColor = isLight ? "rgba(15, 23, 42, 0.12)" : "rgba(255, 255, 255, 0.16)";
-                e.currentTarget.style.background = isLight ? "rgba(255, 255, 255, 0.88)" : "rgba(12, 16, 26, 0.7)";
-                e.currentTarget.style.color = isLight ? "#0f172a" : "rgba(255, 255, 255, 0.85)";
-              }
-            }}
-          >
-            <Cpu size={12} style={{ color: isLight ? "#9333ea" : "#c084fc" }} />
-            <span>WRF-Chem Model</span>
           </button>
         )}
       </div>

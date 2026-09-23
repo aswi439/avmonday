@@ -245,7 +245,7 @@ export function Hero({
   const activeBands = scaleMode === "cpcb" ? CPCB_BANDS : EPA_BANDS;
 
   return (
-    <div className="relative w-full min-h-[calc(100vh-5rem)] flex flex-col justify-center items-center py-12 md:py-16 px-3 sm:px-6 md:px-10 lg:px-12 bg-transparent">
+    <div className="relative w-full flex flex-col items-center pt-[66px] sm:pt-[72px] pb-3 px-3 sm:px-6 md:px-10 lg:px-12 bg-transparent">
       {/* ── AMBIENT DARK BACKDROP RADIAL GLOW ── */}
       <div
         className="absolute inset-0 pointer-events-none"
