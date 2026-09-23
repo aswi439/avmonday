@@ -40,7 +40,6 @@ import { evaluateAlerts, loadAlertSettings } from "@/lib/alertsEngine";
 const AUTHORITY_PAGES: PageType[] = [
   "forecast-datas",
   "historic-data",
-  "atmospheric-dynamics",
   "transports",
   "industry-map",
 ];
@@ -73,7 +72,10 @@ export default function App() {
       }
       if (
         window.location.hash === "#atmospheric-dynamics" ||
-        window.location.hash === "#atmosphere"
+        window.location.hash === "#atmosphere" ||
+        window.location.hash === "#airlens" ||
+        window.location.hash === "#wrf-chem" ||
+        window.location.hash === "#coupled-model"
       ) {
         return "atmospheric-dynamics";
       }
@@ -139,7 +141,10 @@ export default function App() {
         setCurrentPage("historic-data");
       } else if (
         window.location.hash === "#atmospheric-dynamics" ||
-        window.location.hash === "#atmosphere"
+        window.location.hash === "#atmosphere" ||
+        window.location.hash === "#airlens" ||
+        window.location.hash === "#wrf-chem" ||
+        window.location.hash === "#coupled-model"
       ) {
         setCurrentPage("atmospheric-dynamics");
       } else if (
