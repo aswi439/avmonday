@@ -249,9 +249,9 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
       <div className="consensus-panels">
         <article className="chart-panel realism-box relative overflow-hidden">
           <div className="realism-topglow" />
-          <div className="realism-inner !p-5 sm:!p-6 relative">
+          <div className="realism-inner !p-3.5 sm:!p-4.5 relative">
             {/* Vanta Cells Animated Background Layer - extended further down into the upper chart area */}
-            <div className="absolute inset-x-0 top-0 h-[260px] sm:h-[195px] pointer-events-none overflow-hidden z-0 rounded-t-[18px]">
+            <div className="absolute inset-x-0 top-0 h-[150px] sm:h-[125px] pointer-events-none overflow-hidden z-0 rounded-t-[18px]">
               <VantaCellsBackground
                 color1={0x3dbdbd}
                 color2={0xcdeae8}
@@ -261,7 +261,7 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
               />
               {/* Bottom mix / blur fade into solid card background so lower chart bars are unaffected */}
               <div
-                className="absolute inset-x-0 bottom-0 h-24 sm:h-20 pointer-events-none"
+                className="absolute inset-x-0 bottom-0 h-16 sm:h-12 pointer-events-none"
                 style={{
                   background: isLight
                     ? "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 35%, rgba(255,255,255,0.92) 75%, #ffffff 100%)"
@@ -273,7 +273,7 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
             </div>
 
             {/* Top Bar: Hero Live Telemetry (Left) & Controls (Right) */}
-            <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-3.5 border-b border-[var(--hairline)]">
+            <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-2.5 border-b border-[var(--hairline)]">
               {/* Left: Hero Live AQI with Subordinate Min & Peak Extremes */}
               <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                 {/* PRIMARY HERO: Live AQI Display */}
@@ -281,7 +281,7 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
                   {/* Big Bold Live Number with Colored Drop Glow */}
                   <div className="flex items-baseline gap-1.5">
                     <span
-                      className="text-4xl sm:text-5xl font-black font-mono tracking-tight leading-none"
+                      className="text-3xl sm:text-4xl font-black font-mono tracking-tight leading-none"
                       style={{
                         color: liveInfo.color,
                         textShadow: `0 0 24px ${liveInfo.color}40`,
@@ -428,10 +428,10 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
             </div>
 
             {/* Middle: Clean Chart Area */}
-            <div className="w-full h-[240px] sm:h-[270px] mt-2 relative z-10">
+            <div className="w-full h-[175px] sm:h-[195px] mt-1 relative z-10">
               <ResponsiveContainer width="100%" height="100%">
                 {chartType === "line" ? (
-                  <AreaChart data={forecastPoints} margin={{ top: 14, right: 12, left: -14, bottom: 0 }}>
+                  <AreaChart data={forecastPoints} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
                     <defs>
                       <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.25} />
@@ -522,7 +522,7 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
                     />
                   </AreaChart>
                 ) : (
-                  <BarChart data={forecastPoints} margin={{ top: 14, right: 12, left: -14, bottom: 0 }}>
+                  <BarChart data={forecastPoints} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "rgba(15, 23, 42, 0.08)" : "rgba(255, 255, 255, 0.04)"} vertical={false} />
                     <XAxis
                       dataKey="timeFormatted"
@@ -608,7 +608,7 @@ export function ConsensusDashboard({ data, forecast, loading: _loading, error, c
             </div>
 
             {/* Bottom Row: Full forecast data link & Issued timestamp */}
-            <div className="flex items-center justify-between pt-4 mt-2 border-t border-[var(--hairline)]">
+            <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-[var(--hairline)]">
               <a
                 href="#forecast-datas"
                 className="inline-flex items-center gap-1 text-xs font-mono text-[var(--mist-dim)] hover:text-[var(--bone)] transition group"
