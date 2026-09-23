@@ -695,7 +695,7 @@ export function CitizenPollutionExplainer({
       id="citizen-pollution-breakdown"
       className="relative w-full py-12 px-4 sm:px-6 lg:px-8 overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #07090e 0%, #090e15 50%, #07090e 100%)",
+        background: "transparent",
       }}
       aria-label="Citizen Air Pollution Guide"
     >

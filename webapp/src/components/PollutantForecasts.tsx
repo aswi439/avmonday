@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Wind,
   Activity,
@@ -109,6 +109,215 @@ function formatVal(species: Pollutant, val: number): string {
     return val.toFixed(1);
   }
   return String(Math.round(val));
+}
+
+interface SplineForecastSeriesPoint {
+  label: string;
+  fullTime: string;
+  value: number;
+  subIndex: number;
+  category: AqiCategory;
+}
+
+interface SplineForecastCardItem {
+  id: string;
+  chemical: Pollutant;
+  themeColor: string;
+  gradientId: string;
+  series: SplineForecastSeriesPoint[];
+}
+
+interface SplineForecastChartProps {
+  pol: SplineForecastCardItem;
+  horizon: ViewHorizon;
+  hoveredIdx: number | null;
+  onHover: (idx: number | null) => void;
+}
+
+function SplineForecastChart({
+  pol,
+  horizon,
+  hoveredIdx,
+  onHover,
+}: SplineForecastChartProps) {
+  const pathRef = useRef<SVGPathElement>(null);
+  const [measuredLength, setMeasuredLength] = useState<number | null>(null);
+
+  const rawData = pol.series;
+  if (rawData.length < 2) return null;
+
+  const width = 560;
+  const height = 135;
+  const padX = 28;
+  const padYTop = 26;
+  const padYBottom = 24;
+
+  const values = rawData.map((d) => d.value);
+  const min = Math.min(...values) * 0.85;
+  const max = Math.max(...values) * 1.15 || 1;
+  const range = max - min || 1;
+
+  const coords = rawData.map((d, i) => {
+    const x = padX + (i / (rawData.length - 1)) * (width - padX * 2);
+    const y = height - padYBottom - ((d.value - min) / range) * (height - padYTop - padYBottom);
+    return {
+      x,
+      y,
+      val: d.value,
+      label: d.label,
+      fullTime: d.fullTime,
+      category: d.category,
+      subIndex: d.subIndex,
+    };
+  });
+
+  let pathD = `M ${coords[0].x},${coords[0].y}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i];
+    const p1 = coords[i + 1];
+    const cx = (p0.x + p1.x) / 2;
+    pathD += ` C ${cx},${p0.y} ${cx},${p1.y} ${p1.x},${p1.y}`;
+  }
+
+  const areaD = `${pathD} L ${coords[coords.length - 1].x},${height - padYBottom} L ${coords[0].x},${height - padYBottom} Z`;
+
+  // Calculate chord length so on the very first frame the strokeDasharray is already accurate
+  const approxLength = useMemo(() => {
+    let len = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const dx = coords[i + 1].x - coords[i].x;
+      const dy = coords[i + 1].y - coords[i].y;
+      len += Math.sqrt(dx * dx + dy * dy);
+    }
+    return Math.ceil(len * 1.2);
+  }, [coords]);
+
+  useLayoutEffect(() => {
+    if (pathRef.current) {
+      try {
+        const len = Math.ceil(pathRef.current.getTotalLength());
+        if (len > 0) {
+          setMeasuredLength(len);
+        }
+      } catch {
+        // fallback to approxLength
+      }
+    }
+  }, [pathD]);
+
+  const finalLength = measuredLength || approxLength || 800;
+  const clipId = `reveal-clip-${pol.id}-${horizon}`;
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "140px", marginTop: "0.75rem" }}>
+      <svg
+        key={`${pol.id}-${horizon}-${pathD.slice(0, 40)}`}
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ width: "100%", height: "100%", overflow: "visible" }}
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id={pol.gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={pol.themeColor} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={pol.themeColor} stopOpacity="0.0" />
+          </linearGradient>
+          <filter id={`glow-${pol.id}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <clipPath id={clipId}>
+            <rect
+              x={0}
+              y={0}
+              width={width + 20}
+              height={height + 20}
+              className="spline-clip-animated"
+            />
+          </clipPath>
+        </defs>
+
+        {/* Area Fill with synchronized clipPath reveal */}
+        <path d={areaD} fill={`url(#${pol.gradientId})`} clipPath={`url(#${clipId})`} />
+
+        {/* Spline Line animated from start to end */}
+        <path
+          ref={pathRef}
+          d={pathD}
+          fill="none"
+          stroke={pol.themeColor}
+          strokeWidth="2.5"
+          filter={`url(#glow-${pol.id})`}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="spline-path-animated"
+          style={{
+            ["--spline-len" as string]: `${finalLength}px`,
+            strokeDasharray: `${finalLength}px`,
+            strokeDashoffset: `${finalLength}px`,
+          }}
+        />
+
+        {/* Static X-axis Day/Hour Labels */}
+        {coords.map((pt, i) => (
+          <text
+            key={`axis-${i}`}
+            x={pt.x}
+            y={height - 3}
+            textAnchor="middle"
+            fill="var(--mist-faint)"
+            fontSize="9px"
+            fontFamily="var(--sans)"
+          >
+            {pt.label}
+          </text>
+        ))}
+
+        {/* Data Points and Floating Value Labels staggered along line progression */}
+        {coords.map((pt, i) => {
+          const isHovered = hoveredIdx === i;
+          const progress = coords.length > 1 ? i / (coords.length - 1) : 0;
+          const pointDelayMs = Math.round(100 + progress * 1150);
+
+          return (
+            <g
+              key={`pt-${i}`}
+              className="spline-point-animated"
+              style={{
+                animationDelay: `${pointDelayMs}ms`,
+                cursor: "pointer",
+              }}
+              onMouseEnter={() => onHover(i)}
+              onMouseLeave={() => onHover(null)}
+            >
+              {/* Floating Value Text */}
+              <text
+                x={pt.x}
+                y={pt.y - 9}
+                textAnchor="middle"
+                fill={isHovered ? "var(--bone)" : pol.themeColor}
+                fontSize="10px"
+                fontFamily="var(--mono)"
+                fontWeight={isHovered ? "bold" : "600"}
+              >
+                {formatVal(pol.chemical, pt.val)}
+              </text>
+
+              {/* Outer halo point */}
+              <circle
+                cx={pt.x}
+                cy={pt.y}
+                r={isHovered ? 6 : 3.5}
+                fill="var(--deep)"
+                stroke={pol.themeColor}
+                strokeWidth={isHovered ? 2.5 : 2}
+                style={{ transition: "all 0.15s ease" }}
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
 }
 
 interface PollutantForecastsProps {
@@ -249,130 +458,6 @@ export function PollutantForecasts({
       };
     });
   }, [hours, horizon, hour, cursor, cityAggregate, consensus]);
-
-  const renderSplineChart = (pol: (typeof cards)[0]) => {
-    const rawData = pol.series;
-    if (rawData.length < 2) return null;
-
-    const width = 560;
-    const height = 135;
-    const padX = 28;
-    const padYTop = 26;
-    const padYBottom = 24;
-
-    const values = rawData.map((d) => d.value);
-    const min = Math.min(...values) * 0.85;
-    const max = Math.max(...values) * 1.15 || 1;
-    const range = max - min || 1;
-
-    const coords = rawData.map((d, i) => {
-      const x = padX + (i / (rawData.length - 1)) * (width - padX * 2);
-      const y = height - padYBottom - ((d.value - min) / range) * (height - padYTop - padYBottom);
-      return {
-        x,
-        y,
-        val: d.value,
-        label: d.label,
-        fullTime: d.fullTime,
-        category: d.category,
-        subIndex: d.subIndex,
-      };
-    });
-
-    let pathD = `M ${coords[0].x},${coords[0].y}`;
-    for (let i = 0; i < coords.length - 1; i++) {
-      const p0 = coords[i];
-      const p1 = coords[i + 1];
-      const cx = (p0.x + p1.x) / 2;
-      pathD += ` C ${cx},${p0.y} ${cx},${p1.y} ${p1.x},${p1.y}`;
-    }
-
-    const areaD = `${pathD} L ${coords[coords.length - 1].x},${height - padYBottom} L ${coords[0].x},${height - padYBottom} Z`;
-
-    return (
-      <div style={{ position: "relative", width: "100%", height: "140px", marginTop: "0.75rem" }}>
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          style={{ width: "100%", height: "100%", overflow: "visible" }}
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id={pol.gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={pol.themeColor} stopOpacity="0.4" />
-              <stop offset="100%" stopColor={pol.themeColor} stopOpacity="0.0" />
-            </linearGradient>
-            <filter id={`glow-${pol.id}`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-
-          {/* Area Fill */}
-          <path d={areaD} fill={`url(#${pol.gradientId})`} />
-
-          {/* Spline Line */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke={pol.themeColor}
-            strokeWidth="2.5"
-            filter={`url(#glow-${pol.id})`}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Data Points and Labels */}
-          {coords.map((pt, i) => {
-            const isHovered = hoveredIdx[pol.id] === i;
-            return (
-              <g
-                key={i}
-                onMouseEnter={() => setHoveredIdx((prev) => ({ ...prev, [pol.id]: i }))}
-                onMouseLeave={() => setHoveredIdx((prev) => ({ ...prev, [pol.id]: null }))}
-                style={{ cursor: "pointer" }}
-              >
-                {/* Floating Value Text */}
-                <text
-                  x={pt.x}
-                  y={pt.y - 9}
-                  textAnchor="middle"
-                  fill={isHovered ? "#ffffff" : pol.themeColor}
-                  fontSize="10px"
-                  fontFamily="var(--mono)"
-                  fontWeight={isHovered ? "bold" : "600"}
-                >
-                  {formatVal(pol.chemical, pt.val)}
-                </text>
-
-                {/* Outer halo point */}
-                <circle
-                  cx={pt.x}
-                  cy={pt.y}
-                  r={isHovered ? 6 : 3.5}
-                  fill="#0e131f"
-                  stroke={pol.themeColor}
-                  strokeWidth={isHovered ? 2.5 : 2}
-                  style={{ transition: "all 0.15s ease" }}
-                />
-
-                {/* X-axis Day/Hour Label */}
-                <text
-                  x={pt.x}
-                  y={height - 3}
-                  textAnchor="middle"
-                  fill="var(--mist-faint)"
-                  fontSize="9px"
-                  fontFamily="var(--sans)"
-                >
-                  {pt.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
-  };
 
   return (
     <section
@@ -673,7 +758,12 @@ export function PollutantForecasts({
                     </div>
 
                     {/* Spline Area Chart */}
-                    {renderSplineChart(pol)}
+                    <SplineForecastChart
+                      pol={pol}
+                      horizon={horizon}
+                      hoveredIdx={hoveredIdx[pol.id] ?? null}
+                      onHover={(idx) => setHoveredIdx((prev) => ({ ...prev, [pol.id]: idx }))}
+                    />
                   </div>
 
                   {/* Bottom Metrics Bar */}

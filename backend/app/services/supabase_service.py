@@ -202,3 +202,85 @@ async def upsert_rows(table: str, rows: list[dict[str, Any]], on_conflict: str) 
     except httpx.HTTPError as exc:
         logger.warning("Supabase upsert to %s failed: %s", table, exc)
         return 0
+
+
+# ── Authority session & audit logging ─────────────────────────────────────────
+
+
+async def log_authority_action(
+    code: str,
+    user_id: str,
+    email: str | None,
+    full_name: str | None,
+    action: str = "login",
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> bool:
+    """Log an authority login/action into Supabase public.authority_logs.
+
+    Non-fatal: if public.authority_logs is not yet created in Supabase or unreachable,
+    logs a warning and returns False so the login flow continues uninterrupted.
+    """
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return False
+
+    url = f"{settings.supabase_url.rstrip('/')}/rest/v1/authority_logs"
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    payload = {
+        "code": code,
+        "user_id": user_id,
+        "email": email or "",
+        "full_name": full_name or "Authority Officer",
+        "action": action,
+        "ip_address": ip_address or "",
+        "user_agent": user_agent or "",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code in (200, 201):
+                return True
+            logger.info("Supabase authority_logs write returned HTTP %s (table may need creation): %s", resp.status_code, resp.text[:120])
+            return False
+    except Exception as exc:
+        logger.warning("Supabase authority_logs write failed: %s", exc)
+        return False
+
+
+async def upsert_authority_profile(
+    user_id: str,
+    email: str,
+    full_name: str,
+) -> bool:
+    """Upsert an authority user row into Supabase public.profiles table."""
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return False
+
+    url = f"{settings.supabase_url.rstrip('/')}/rest/v1/profiles"
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    payload = {
+        "id": user_id,
+        "email": email,
+        "full_name": full_name,
+        "role": "authority",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(url, json=[payload], headers=headers)
+            return resp.status_code in (200, 201)
+    except Exception as exc:
+        logger.warning("Supabase profile upsert failed: %s", exc)
+        return False
+

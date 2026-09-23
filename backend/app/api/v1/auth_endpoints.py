@@ -116,6 +116,13 @@ class ElevateRequest(BaseModel):
     invite_code: str = Field(min_length=4, max_length=64)
 
 
+class AuthorityCodeLoginRequest(BaseModel):
+    """Authority login via direct Authority Console Code."""
+
+    code: str = Field(min_length=6, max_length=64)
+    officer_name: str | None = Field(default=None, max_length=120)
+
+
 class OperatorSessionRequest(BaseModel):
     """Operator-console password (value lives only in the server's .env)."""
 
@@ -273,6 +280,32 @@ async def elevate(
     except AuthError as exc:
         raise _auth_error(exc) from exc
     return _token_response(updated)
+
+
+@router.post("/authority-code-login", response_model=TokenResponse)
+@limiter.limit("15/minute")
+async def authority_code_login(
+    request: Request,
+    payload: AuthorityCodeLoginRequest,
+) -> TokenResponse:
+    """Log in directly using an official Authority Console Code.
+
+    Verifies the code against Supabase, redeems it or re-authenticates the assigned
+    officer, logs the login event in Supabase authority_logs, and mints an authority JWT.
+    """
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    try:
+        user = await auth_service.authenticate_by_authority_code(
+            code=payload.code,
+            officer_name=payload.officer_name,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
+    except AuthError as exc:
+        raise _auth_error(exc) from exc
+    return _token_response(user)
 
 
 @router.get("/me", response_model=MeResponse)

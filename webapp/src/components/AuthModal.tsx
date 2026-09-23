@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Building2, Users, ShieldCheck, Loader2, Check, AlertCircle } from "lucide-react";
+import { X, Building2, Users, ShieldCheck, Loader2, Check, AlertCircle, KeyRound } from "lucide-react";
 import {
   login,
+  loginWithAuthorityCode,
   register,
   signInWithGoogle,
   setPendingAuthorityCode,
@@ -25,6 +26,7 @@ interface AuthModalProps {
   open: boolean;
   onClose: () => void;
   onAuthed: (user: AuthUser) => void;
+  initialMethod?: "password" | "authority_code";
 }
 
 type Mode = "signin" | "signup";
@@ -58,13 +60,16 @@ function nameProblem(name: string): string | null {
   return null;
 }
 
-export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
+export function AuthModal({ open, onClose, onAuthed, initialMethod }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>("signin");
+  const [signInMethod, setSignInMethod] = useState<"password" | "authority_code">("password");
   const [role, setRole] = useState<Role>("citizen");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [authorityCode, setAuthorityCode] = useState("");
+  const [officerName, setOfficerName] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +83,11 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
       setBusy(false);
       setGoogleBusy(false);
       setTouched({});
+      if (initialMethod) {
+        setSignInMethod(initialMethod);
+      }
     }
-  }, [open, mode]);
+  }, [open, mode, initialMethod]);
 
   const pwChecks = useMemo(() => passwordChecks(password), [password]);
   const pwValid = Object.values(pwChecks).every(Boolean);
@@ -101,6 +109,9 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
     mode === "signup" &&
     (!!emailProblem(email) || !pwValid || !!nameProblem(fullName) || (role === "authority" && !INVITE_RE.test(inviteCode.trim().toUpperCase())));
 
+  const authorityLoginBlocked =
+    mode === "signin" && signInMethod === "authority_code" && !INVITE_RE.test(authorityCode.trim().toUpperCase());
+
   const finish = (user: AuthUser) => {
     onAuthed(user);
     onClose();
@@ -110,36 +121,65 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
     e.preventDefault();
     setError(null);
     setNotice(null);
-    setTouched({ email: true, fullName: true, inviteCode: true });
+    setTouched({ email: true, fullName: true, inviteCode: true, authorityCode: true });
 
-    if (mode === "signup") {
+    if (mode === "signin") {
+      if (signInMethod === "authority_code") {
+        const code = authorityCode.trim().toUpperCase();
+        if (!code) {
+          return setError("Please enter your authority console code.");
+        }
+        if (!INVITE_RE.test(code)) {
+          return setError("Codes look like NCR72-XXXXXXXX — check for typos.");
+        }
+        setBusy(true);
+        try {
+          const user = await loginWithAuthorityCode(code, officerName.trim() || undefined);
+          finish(user);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Authority login failed.");
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
       const p = emailProblem(email);
       if (p) return setError(p);
-      if (!pwValid)
-        return setError("Password doesn't meet the requirements below yet.");
-      const np = nameProblem(fullName);
-      if (np) return setError(np);
-      if (role === "authority") {
-        const code = inviteCode.trim().toUpperCase();
-        if (!INVITE_RE.test(code))
-          return setError("Enter the official invite code issued to your organisation.");
+      setBusy(true);
+      try {
+        const user = await login(email.trim().toLowerCase(), password);
+        finish(user);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      } finally {
+        setBusy(false);
       }
-    } else if (emailProblem(email)) {
-      return setError(emailProblem(email)!);
+      return;
+    }
+
+    // mode === "signup"
+    const p = emailProblem(email);
+    if (p) return setError(p);
+    if (!pwValid)
+      return setError("Password doesn't meet the requirements below yet.");
+    const np = nameProblem(fullName);
+    if (np) return setError(np);
+    if (role === "authority") {
+      const code = inviteCode.trim().toUpperCase();
+      if (!INVITE_RE.test(code))
+        return setError("Enter the official invite code issued to your organisation.");
     }
 
     setBusy(true);
     try {
-      const user =
-        mode === "signin"
-          ? await login(email.trim().toLowerCase(), password)
-          : await register({
-              email: email.trim().toLowerCase(),
-              password,
-              full_name: fullName.trim(),
-              role,
-              invite_code: role === "authority" ? inviteCode.trim().toUpperCase() : undefined,
-            });
+      const user = await register({
+        email: email.trim().toLowerCase(),
+        password,
+        full_name: fullName.trim(),
+        role,
+        invite_code: role === "authority" ? inviteCode.trim().toUpperCase() : undefined,
+      });
       finish(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -279,154 +319,291 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
         </div>
 
         <form onSubmit={submit} noValidate>
-          {mode === "signup" && (
-            <>
-              {/* Role picker */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "1rem" }}>
-                {(
-                  [
-                    { id: "citizen" as Role, icon: Users, label: "Citizen", desc: "Personal air-quality tools", color: "var(--live)" },
-                    { id: "authority" as Role, icon: Building2, label: "Authority", desc: "Official account (invite)", color: "var(--cyan)" },
-                  ]
-                ).map((r) => {
-                  const Icon = r.icon;
-                  const active = role === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setRole(r.id)}
-                      style={{
-                        position: "relative",
-                        zIndex: active ? 2 : 1,
-                        textAlign: "left",
-                        padding: "0.7rem 0.8rem",
-                        background: active ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.3)",
-                        border: `1px solid ${active ? r.color : "rgba(255,255,255,0.12)"}`,
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <Icon size={16} style={{ color: active ? r.color : "rgba(255,255,255,0.5)", marginBottom: 4 }} />
-                      <div style={{ fontFamily: "var(--mono)", fontSize: "12.5px", fontWeight: 600, color: "#fff" }}>{r.label}</div>
-                      <div style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.55)", fontFamily: "var(--mono)", marginTop: 2 }}>{r.desc}</div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <input
-                type="text"
-                placeholder="Full name (e.g. Aditya Sharma)"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
-                maxLength={120}
-                autoComplete="name"
-                style={{ ...errStyle(!!nameErr), marginBottom: nameErr ? "0.2rem" : "0.7rem" }}
-              />
-              {fieldError(nameErr)}
-            </>
-          )}
-
-          <input
-            type="email"
-            placeholder="Email (name@example.com)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-            maxLength={254}
-            autoComplete="email"
-            style={{ ...errStyle(!!emailErr), marginBottom: emailErr ? "0.2rem" : "0.7rem" }}
-          />
-          {fieldError(emailErr)}
-
-          <input
-            type="password"
-            placeholder={mode === "signup" ? "Create a password" : "Password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            maxLength={128}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            style={{ ...inputStyle, marginBottom: mode === "signup" ? "0.5rem" : "0.9rem" }}
-          />
-
-          {/* Live password checklist (registration only) */}
-          {mode === "signup" && (
-            <div
-              style={{
-                marginBottom: "0.9rem",
-                padding: "0.6rem 0.75rem",
-                background: "rgba(0,0,0,0.3)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "8px",
-              }}
-            >
-              <div style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: "0.4rem" }}>
-                Password must have
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.25rem 0.6rem" }}>
-                {(
-                  [
-                    ["length", "12+ characters"],
-                    ["upper", "An uppercase letter"],
-                    ["lower", "A lowercase letter"],
-                    ["digit", "A digit"],
-                    ["noSpaces", "No spaces/symbols like space or tab"],
-                  ] as const
-                ).map(([key, label]) => {
-                  const ok = pwChecks[key];
-                  return (
-                    <div key={key} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      {ok ? (
-                        <Check size={11} style={{ color: "#4ade80", flexShrink: 0 }} />
-                      ) : (
-                        <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.3)", flexShrink: 0, display: "inline-block" }} />
-                      )}
-                      <span style={{ fontFamily: "var(--mono)", fontSize: "10.5px", color: ok ? "#4ade80" : "rgba(255,255,255,0.55)" }}>
-                        {label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+          {mode === "signin" && (
+            <div style={{ display: "flex", gap: "0.35rem", padding: "3px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", marginBottom: "1rem", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <button
+                type="button"
+                onClick={() => { setSignInMethod("password"); setError(null); }}
+                style={{
+                  flex: 1,
+                  padding: "0.45rem 0.5rem",
+                  borderRadius: "6px",
+                  background: signInMethod === "password" ? "rgba(255,255,255,0.14)" : "transparent",
+                  border: "none",
+                  color: signInMethod === "password" ? "#fff" : "rgba(255,255,255,0.55)",
+                  fontFamily: "var(--mono)",
+                  fontSize: "11.5px",
+                  fontWeight: signInMethod === "password" ? 600 : 400,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.35rem",
+                }}
+              >
+                <Users size={12} />
+                <span>Password</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSignInMethod("authority_code"); setError(null); }}
+                style={{
+                  flex: 1,
+                  padding: "0.45rem 0.5rem",
+                  borderRadius: "6px",
+                  background: signInMethod === "authority_code" ? "rgba(56,189,248,0.18)" : "transparent",
+                  border: `1px solid ${signInMethod === "authority_code" ? "rgba(56,189,248,0.45)" : "transparent"}`,
+                  color: signInMethod === "authority_code" ? "var(--cyan)" : "rgba(255,255,255,0.55)",
+                  fontFamily: "var(--mono)",
+                  fontSize: "11.5px",
+                  fontWeight: signInMethod === "authority_code" ? 700 : 400,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.35rem",
+                }}
+              >
+                <ShieldCheck size={13} style={{ color: "var(--cyan)" }} />
+                <span>Authority Code</span>
+              </button>
             </div>
           )}
 
-          {mode === "signup" && role === "authority" && (
+          {mode === "signin" && signInMethod === "authority_code" ? (
             <div
               style={{
-                marginBottom: "0.7rem",
-                padding: "0.75rem 0.85rem",
+                marginBottom: "0.9rem",
+                padding: "0.85rem 0.9rem",
                 background: "rgba(56,189,248,0.07)",
                 border: "1px solid rgba(56,189,248,0.3)",
                 borderRadius: "10px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-                <ShieldCheck size={13} style={{ color: "var(--cyan)" }} />
-                <span style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "#7dd3fc", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600 }}>
-                  Official invite code required
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.45rem" }}>
+                <KeyRound size={14} style={{ color: "var(--cyan)" }} />
+                <span style={{ fontFamily: "var(--mono)", fontSize: "11.5px", color: "#7dd3fc", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 700 }}>
+                  Authority Console Code
                 </span>
               </div>
+              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)", fontFamily: "var(--mono)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                Enter your official NCR·72 console code. Logs in directly and records your session in Supabase.
+              </div>
+
               <input
                 type="text"
                 placeholder="NCR72-XXXXXXXX"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                onBlur={() => setTouched((t) => ({ ...t, inviteCode: true }))}
+                value={authorityCode}
+                onChange={(e) => setAuthorityCode(e.target.value.toUpperCase())}
+                onBlur={() => setTouched((t) => ({ ...t, authorityCode: true }))}
                 maxLength={32}
                 autoComplete="off"
                 spellCheck={false}
-                style={{ ...errStyle(!!inviteErr), textTransform: "uppercase" }}
+                style={{
+                  ...errStyle(touched.authorityCode && !INVITE_RE.test(authorityCode.trim().toUpperCase())),
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  fontWeight: 600,
+                  marginBottom: "0.6rem",
+                }}
               />
-              {fieldError(inviteErr) ?? (
-                <div style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.5)", fontFamily: "var(--mono)", marginTop: "0.4rem" }}>
-                  Issued by the NCR·72 operator to verified government accounts. Every code is single-use.
+              {touched.authorityCode && !INVITE_RE.test(authorityCode.trim().toUpperCase()) && (
+                <div style={{ display: "flex", gap: "0.3rem", alignItems: "flex-start", marginTop: "-0.3rem", marginBottom: "0.5rem" }}>
+                  <AlertCircle size={12} style={{ color: "#fca5a5", flexShrink: 0, marginTop: 1 }} />
+                  <span style={{ fontSize: "11px", color: "#fca5a5", fontFamily: "var(--mono)" }}>
+                    Codes look like NCR72-XXXXXXXX — check for typos.
+                  </span>
                 </div>
               )}
+
+              <input
+                type="text"
+                placeholder="Officer / Agency name (optional)"
+                value={officerName}
+                onChange={(e) => setOfficerName(e.target.value)}
+                maxLength={120}
+                autoComplete="name"
+                style={{ ...inputStyle, fontSize: "12px" }}
+              />
             </div>
+          ) : (
+            <>
+              {mode === "signup" && (
+                <>
+                  {/* Role picker */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "1rem" }}>
+                    {(
+                      [
+                        { id: "citizen" as Role, icon: Users, label: "Citizen", desc: "Personal air-quality tools", color: "var(--live)" },
+                        { id: "authority" as Role, icon: Building2, label: "Authority", desc: "Official account (invite)", color: "var(--cyan)" },
+                      ]
+                    ).map((r) => {
+                      const Icon = r.icon;
+                      const active = role === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setRole(r.id)}
+                          style={{
+                            position: "relative",
+                            zIndex: active ? 2 : 1,
+                            textAlign: "left",
+                            padding: "0.7rem 0.8rem",
+                            background: active ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.3)",
+                            border: `1px solid ${active ? r.color : "rgba(255,255,255,0.12)"}`,
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <Icon size={16} style={{ color: active ? r.color : "rgba(255,255,255,0.5)", marginBottom: 4 }} />
+                          <div style={{ fontFamily: "var(--mono)", fontSize: "12.5px", fontWeight: 600, color: "#fff" }}>{r.label}</div>
+                          <div style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.55)", fontFamily: "var(--mono)", marginTop: 2 }}>{r.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Full name (e.g. Aditya Sharma)"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
+                    maxLength={120}
+                    autoComplete="name"
+                    style={{ ...errStyle(!!nameErr), marginBottom: nameErr ? "0.2rem" : "0.7rem" }}
+                  />
+                  {fieldError(nameErr)}
+                </>
+              )}
+
+              <input
+                type="email"
+                placeholder="Email (name@example.com)"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                maxLength={254}
+                autoComplete="email"
+                style={{ ...errStyle(!!emailErr), marginBottom: emailErr ? "0.2rem" : "0.7rem" }}
+              />
+              {fieldError(emailErr)}
+
+              <input
+                type="password"
+                placeholder={mode === "signup" ? "Create a password" : "Password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                maxLength={128}
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                style={{ ...inputStyle, marginBottom: mode === "signup" ? "0.5rem" : "0.9rem" }}
+              />
+
+              {/* Live password checklist (registration only) */}
+              {mode === "signup" && (
+                <div
+                  style={{
+                    marginBottom: "0.9rem",
+                    padding: "0.6rem 0.75rem",
+                    background: "rgba(0,0,0,0.3)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: "0.4rem" }}>
+                    Password must have
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.25rem 0.6rem" }}>
+                    {(
+                      [
+                        ["length", "12+ characters"],
+                        ["upper", "An uppercase letter"],
+                        ["lower", "A lowercase letter"],
+                        ["digit", "A digit"],
+                        ["noSpaces", "No spaces/symbols like space or tab"],
+                      ] as const
+                    ).map(([key, label]) => {
+                      const ok = pwChecks[key];
+                      return (
+                        <div key={key} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          {ok ? (
+                            <Check size={11} style={{ color: "#4ade80", flexShrink: 0 }} />
+                          ) : (
+                            <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.3)", flexShrink: 0, display: "inline-block" }} />
+                          )}
+                          <span style={{ fontFamily: "var(--mono)", fontSize: "10.5px", color: ok ? "#4ade80" : "rgba(255,255,255,0.55)" }}>
+                            {label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {mode === "signup" && role === "authority" && (
+                <div
+                  style={{
+                    marginBottom: "0.7rem",
+                    padding: "0.75rem 0.85rem",
+                    background: "rgba(56,189,248,0.07)",
+                    border: "1px solid rgba(56,189,248,0.3)",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
+                    <ShieldCheck size={13} style={{ color: "var(--cyan)" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "#7dd3fc", letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 600 }}>
+                      Official invite code required
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="NCR72-XXXXXXXX"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    onBlur={() => setTouched((t) => ({ ...t, inviteCode: true }))}
+                    maxLength={32}
+                    autoComplete="off"
+                    spellCheck={false}
+                    style={{ ...errStyle(!!inviteErr), textTransform: "uppercase" }}
+                  />
+                  {fieldError(inviteErr) ?? (
+                    <div style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.5)", fontFamily: "var(--mono)", marginTop: "0.4rem" }}>
+                      Issued by the NCR·72 operator to verified government accounts. Every code is single-use.
+                    </div>
+                  )}
+                  <div style={{ marginTop: "0.6rem", paddingTop: "0.5rem", borderTop: "1px solid rgba(56,189,248,0.2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "10.5px", color: "rgba(255,255,255,0.55)", fontFamily: "var(--mono)" }}>
+                      Have your code?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("signin");
+                        setSignInMethod("authority_code");
+                        if (inviteCode) setAuthorityCode(inviteCode);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--cyan)",
+                        fontFamily: "var(--mono)",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: 0,
+                      }}
+                    >
+                      Sign in directly with code &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {error && (
@@ -449,12 +626,15 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
 
           <button
             type="submit"
-            disabled={busy || googleBusy || signupBlocked}
+            disabled={busy || googleBusy || (mode === "signup" ? signupBlocked : (signInMethod === "authority_code" && authorityLoginBlocked))}
             title={signupBlocked ? "Complete the highlighted fields to continue" : undefined}
             style={{
               width: "100%",
               padding: "0.7rem 0",
-              background: busy || signupBlocked ? "rgba(56,189,248,0.3)" : "rgba(56,189,248,0.85)",
+              background:
+                busy || (mode === "signup" ? signupBlocked : (signInMethod === "authority_code" && authorityLoginBlocked))
+                  ? "rgba(56,189,248,0.3)"
+                  : "rgba(56,189,248,0.85)",
               border: "none",
               borderRadius: "8px",
               color: "#04121e",
@@ -462,7 +642,7 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
               fontSize: "13px",
               fontWeight: 700,
               letterSpacing: "0.04em",
-              cursor: busy ? "wait" : signupBlocked ? "not-allowed" : "pointer",
+              cursor: busy ? "wait" : (mode === "signup" ? signupBlocked : (signInMethod === "authority_code" && authorityLoginBlocked)) ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -472,84 +652,86 @@ export function AuthModal({ open, onClose, onAuthed }: AuthModalProps) {
           >
             {busy && <Loader2 size={14} className="spin" />}
             {mode === "signin"
-              ? "Sign in"
+              ? signInMethod === "authority_code"
+                ? "Access Authority Console"
+                : "Sign in"
               : role === "authority"
               ? "Register as Authority"
               : "Register as Citizen"}
           </button>
         </form>
 
-        {/* Divider + Google (Supabase OAuth) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", margin: "1rem 0 0.8rem" }}>
-          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.14)" }} />
-          <span style={{ fontFamily: "var(--mono)", fontSize: "10px", color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-            or
-          </span>
-          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.14)" }} />
-        </div>
+        {/* Divider + Google (Supabase OAuth) - only for password & citizen signup */}
+        {!(mode === "signin" && signInMethod === "authority_code") && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", margin: "1rem 0 0.8rem" }}>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.14)" }} />
+              <span style={{ fontFamily: "var(--mono)", fontSize: "10px", color: "rgba(255,255,255,0.45)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                or
+              </span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.14)" }} />
+            </div>
 
-        <button
-          type="button"
-          className="auth-google"
-          disabled={busy || googleBusy}
-          onClick={async () => {
-            setError(null);
-            // Authority-via-Google: carry the invite code through the OAuth
-            // redirect and redeem it automatically on return.
-            if (mode === "signup" && role === "authority") {
-              const code = inviteCode.trim().toUpperCase();
-              if (!INVITE_RE.test(code)) {
-                setError("Enter your official invite code first, then continue with Google.");
-                return;
-              }
-              setPendingAuthorityCode(code);
-            }
-            setGoogleBusy(true);
-            try {
-              await signInWithGoogle();
-              // Browser navigates away to Google's consent screen; nothing after
-              // this line runs in the success path.
-            } catch (err) {
-              setError(
-                err instanceof Error
-                  ? err.message
-                  : "Google sign-in is unavailable right now."
-              );
-              setGoogleBusy(false);
-            }
-          }}
-          style={{
-            width: "100%",
-            padding: "0.65rem 0",
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.3)",
-            borderRadius: "8px",
-            color: "#fff",
-            fontFamily: "var(--mono)",
-            fontSize: "12.5px",
-            fontWeight: 600,
-            cursor: googleBusy ? "wait" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.55rem",
-            transition: "background 0.2s ease, border-color 0.2s ease",
-          }}
-        >
-          {googleBusy ? <Loader2 size={14} className="spin" /> : <GoogleIcon />}
-          <span>Continue with Google</span>
-        </button>
-        <div
-          style={{
-            marginTop: "0.55rem",
-            textAlign: "center",
-            fontFamily: "var(--mono)",
-            fontSize: "10px",
-            color: "rgba(255,255,255,0.4)",
-          }}
-        >
-          Google accounts join as citizens — pick "Authority" above and enter your invite code first, and it's applied automatically after Google verifies you.
-        </div>
+            <button
+              type="button"
+              className="auth-google"
+              disabled={busy || googleBusy}
+              onClick={async () => {
+                setError(null);
+                if (mode === "signup" && role === "authority") {
+                  const code = inviteCode.trim().toUpperCase();
+                  if (!INVITE_RE.test(code)) {
+                    setError("Enter your official invite code first, then continue with Google.");
+                    return;
+                  }
+                  setPendingAuthorityCode(code);
+                }
+                setGoogleBusy(true);
+                try {
+                  await signInWithGoogle();
+                } catch (err) {
+                  setError(
+                    err instanceof Error
+                      ? err.message
+                      : "Google sign-in is unavailable right now."
+                  );
+                  setGoogleBusy(false);
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: "0.65rem 0",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                color: "#fff",
+                fontFamily: "var(--mono)",
+                fontSize: "12.5px",
+                fontWeight: 600,
+                cursor: googleBusy ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.55rem",
+                transition: "background 0.2s ease, border-color 0.2s ease",
+              }}
+            >
+              {googleBusy ? <Loader2 size={14} className="spin" /> : <GoogleIcon />}
+              <span>Continue with Google</span>
+            </button>
+            <div
+              style={{
+                marginTop: "0.55rem",
+                textAlign: "center",
+                fontFamily: "var(--mono)",
+                fontSize: "10px",
+                color: "rgba(255,255,255,0.4)",
+              }}
+            >
+              Google accounts join as citizens — pick "Authority" above and enter your invite code first, and it's applied automatically after Google verifies you.
+            </div>
+          </>
+        )}
         </>)}
 
         {/* Authority members see their status */}

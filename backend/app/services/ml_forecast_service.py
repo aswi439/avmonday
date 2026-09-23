@@ -64,7 +64,7 @@ def _load_bundle() -> tuple[Any, dict[str, Any], bool] | None:
             if metadata.get("feature_names") != expected:
                 raise ValueError(f"packaged model feature schema mismatch: expected {expected}")
             return model, metadata, is_chem
-        except (OSError, KeyError, TypeError, ValueError, AttributeError):
+        except Exception:
             continue
     return None
 

@@ -19,10 +19,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import sqlite3
 import threading
 import time
+
+logger = logging.getLogger(__name__)
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -440,6 +443,113 @@ def _advisory_to_dict(record: dict[str, Any]) -> dict[str, Any]:
     except (json.JSONDecodeError, TypeError):
         out["areas"] = []
     return out
+
+
+# ── Authority console code authentication & logging ──────────────────────────
+
+
+async def authenticate_by_authority_code(
+    code: str,
+    officer_name: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> dict[str, Any]:
+    """Authenticate directly using an Authority Console Code issued in Supabase."""
+    from app.services import invite_store, supabase_service
+
+    norm_code = invite_store.normalize(code)
+    if not norm_code:
+        raise AuthError("Please enter your authority console code.")
+    shape_problem = invite_store.validate_format(norm_code)
+    if shape_problem:
+        raise AuthError(shape_problem, 422)
+
+    status = invite_store.get_status(norm_code)
+    if not status.get("exists"):
+        raise AuthError("Authority code was not found in the database. Please verify the code.", 403)
+
+    label = (status.get("label") or "").strip()
+    full_name = officer_name.strip() if officer_name and officer_name.strip() else (label or "Authority Officer")
+    clean_suffix = norm_code.replace("NCR72-", "").lower()
+    default_email = f"authority.{clean_suffix}@ncr72.gov.in"
+
+    user_id: str
+    email: str
+
+    if not status.get("used"):
+        # Code is pristine — claim it!
+        user_id = secrets.token_urlsafe(16)
+        email = default_email
+        salt = secrets.token_bytes(16)
+        dummy_pw = secrets.token_urlsafe(24)
+        now = time.time()
+
+        with _lock, _db() as conn:
+            row = conn.execute("SELECT id, email, full_name FROM users WHERE email = ?", (email,)).fetchone()
+            if row:
+                user_id = row["id"]
+                conn.execute("UPDATE users SET role = 'authority' WHERE id = ?", (user_id,))
+            else:
+                conn.execute(
+                    "INSERT INTO users (id, email, full_name, role, password_salt, password_hash, created_at, auth_provider) "
+                    "VALUES (?, ?, ?, 'authority', ?, ?, ?, 'authority_code')",
+                    (user_id, email, full_name, salt, _hash_password(dummy_pw, salt), now),
+                )
+
+        try:
+            invite_store.redeem(norm_code, user_id, email)
+        except invite_store.InviteStoreError as exc:
+            post_status = invite_store.get_status(norm_code)
+            if not post_status.get("used"):
+                raise AuthError(exc.message, exc.status_code) from exc
+    else:
+        # Code was previously redeemed — allow the officer holding this code to sign in
+        used_by = status.get("used_by")
+        used_by_email = status.get("used_by_email") or default_email
+        email = used_by_email
+        user_id = used_by or secrets.token_urlsafe(16)
+
+        with _lock, _db() as conn:
+            row = conn.execute(
+                "SELECT id, email, full_name, role FROM users WHERE id = ? OR email = ?",
+                (user_id, email),
+            ).fetchone()
+            if row:
+                user_id = row["id"]
+                full_name = row["full_name"] or full_name
+                if row["role"] != "authority":
+                    conn.execute("UPDATE users SET role = 'authority' WHERE id = ?", (user_id,))
+            else:
+                salt = secrets.token_bytes(16)
+                dummy_pw = secrets.token_urlsafe(24)
+                conn.execute(
+                    "INSERT INTO users (id, email, full_name, role, password_salt, password_hash, created_at, auth_provider) "
+                    "VALUES (?, ?, ?, 'authority', ?, ?, ?, 'authority_code')",
+                    (user_id, email, full_name, salt, _hash_password(dummy_pw, salt), time.time()),
+                )
+
+    # 1. Sync authority profile to Supabase public.profiles
+    try:
+        await supabase_service.upsert_authority_profile(user_id, email, full_name)
+    except Exception as err:
+        logger.warning("Failed to sync authority profile to Supabase: %s", err)
+
+    # 2. Record authority login action in Supabase public.authority_logs
+    try:
+        await supabase_service.log_authority_action(
+            code=norm_code,
+            user_id=user_id,
+            email=email,
+            full_name=full_name,
+            action="login",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    except Exception as err:
+        logger.warning("Failed to record authority log in Supabase: %s", err)
+
+    return {"id": user_id, "email": email, "full_name": full_name, "role": "authority"}
+
 
 
 

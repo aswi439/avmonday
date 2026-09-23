@@ -181,16 +181,41 @@ export function getInversion(signal?: AbortSignal): Promise<InversionStatus[]> {
   return fetchJson<InversionStatus[]>(`${API}/inversion/status`, { timeoutMs: TIMEOUTS.inversion, signal });
 }
 
-export function getPlume(signal?: AbortSignal): Promise<PlumeVectorsResponse> {
-  return fetchJson<PlumeVectorsResponse>(`${API}/plume/vectors`, { timeoutMs: TIMEOUTS.plume, signal });
+export async function getPlume(signal?: AbortSignal): Promise<PlumeVectorsResponse> {
+  try {
+    return await fetchJson<PlumeVectorsResponse>(`${API}/plume/vectors`, { timeoutMs: TIMEOUTS.plume, signal });
+  } catch (error) {
+    try {
+      const fallback = await fetch("/plume-fallback.json", { signal });
+      if (fallback.ok) return (await fallback.json()) as PlumeVectorsResponse;
+    } catch {}
+    throw error;
+  }
 }
 
 export function getOverview(signal?: AbortSignal): Promise<CityOverview> {
   return fetchJson<CityOverview>(`${API}/realtime/overview`, { timeoutMs: TIMEOUTS.realtime, signal });
 }
 
-export function getStations(signal?: AbortSignal): Promise<StationReading[]> {
-  return fetchJson<StationReading[]>(`${API}/realtime/stations`, { timeoutMs: TIMEOUTS.realtime, signal });
+export async function getStations(signal?: AbortSignal): Promise<StationReading[]> {
+  try {
+    const live = await fetchJson<StationReading[]>(`${API}/realtime/stations`, { timeoutMs: TIMEOUTS.realtime, signal });
+    if (Array.isArray(live) && live.length > 0) return live;
+  } catch (error) {
+    try {
+      const fallback = await fetch("/stations-fallback.json", { signal });
+      if (fallback.ok) {
+        const data = (await fallback.json()) as StationReading[];
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch {}
+    throw error;
+  }
+  try {
+    const fallback = await fetch("/stations-fallback.json", { signal });
+    if (fallback.ok) return (await fallback.json()) as StationReading[];
+  } catch {}
+  return [];
 }
 
 export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {

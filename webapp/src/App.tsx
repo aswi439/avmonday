@@ -17,7 +17,6 @@ import { AlertsPage } from "@/components/AlertsPage";
 import { AqiReportPage } from "@/components/AqiReportPage";
 import { AuthModal } from "@/components/AuthModal";
 import { OperatorConsole } from "@/components/OperatorConsole";
-import { AdvisoryBar } from "@/components/AdvisoryBar";
 import { Landing } from "@/components/Landing";
 import { useAuth } from "@/hooks/useAuth";
 import { IndustryMapView } from "@/components/IndustryMapView";
@@ -25,6 +24,7 @@ import { PollutantCardStackSection } from "@/components/PollutantCardStackSectio
 import { CitizenIndustryPage } from "@/components/CitizenIndustryPage";
 import { CitizenPollutionExplainer } from "@/components/CitizenPollutionExplainer";
 import GradualBlur from "@/components/ui/GradualBlur";
+import MagicRings from "@/components/ui/MagicRings";
 import { useCityAggregate } from "@/hooks/useCityAggregate";
 import { useConsensus } from "@/hooks/useConsensus";
 import { useCursor } from "@/hooks/useCursor";
@@ -53,6 +53,7 @@ export default function App() {
   const realtime = useRealtimeData();
   const auth = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
+  const [authInitialMethod, setAuthInitialMethod] = useState<"password" | "authority_code">("password");
   const [operatorOpen, setOperatorOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState<number>(0);
 
@@ -293,6 +294,39 @@ export default function App() {
 
   return (
     <>
+      {/* React Bits <MagicRings /> Background Ambient Canvas */}
+      {!reduced && (
+        <div
+          className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
+          style={{ opacity: 0.6 }}
+          aria-hidden="true"
+        >
+          <MagicRings
+            color="#b181dd"
+            colorTwo="#6b6dd9"
+            ringCount={6}
+            speed={1}
+            attenuation={10}
+            lineThickness={2}
+            baseRadius={0.35}
+            radiusStep={0.1}
+            scaleRate={0.1}
+            opacity={0.8}
+            blur={0}
+            noiseAmount={0.1}
+            rotation={0}
+            ringGap={1.5}
+            fadeIn={0.7}
+            fadeOut={0.5}
+            followMouse={true}
+            mouseInfluence={0.2}
+            hoverScale={1.2}
+            parallax={0.05}
+            clickBurst={true}
+          />
+        </div>
+      )}
+
       <HazeField pm25={pm25} reduced={reduced} />
 
       <Rail
@@ -305,7 +339,10 @@ export default function App() {
         hasCriticalAlert={hasCriticalAlert}
         user={auth.user}
         currentPage={effectivePage}
-        onSignIn={() => setAuthOpen(true)}
+        onSignIn={() => {
+          setAuthInitialMethod("password");
+          setAuthOpen(true);
+        }}
         onOperatorConsole={() => setOperatorOpen(true)}
         onPageChange={(page) => {
           // Extra guard: a citizen clicking an authority page can't happen via
@@ -317,7 +354,17 @@ export default function App() {
 
       {/* Auth gate: signed-out users see ONLY the landing page — no data, no tabs. */}
       {!auth.user ? (
-        <Landing onSignIn={() => setAuthOpen(true)} signInError={auth.authError} />
+        <Landing
+          onSignIn={() => {
+            setAuthInitialMethod("password");
+            setAuthOpen(true);
+          }}
+          onSignInAuthority={() => {
+            setAuthInitialMethod("authority_code");
+            setAuthOpen(true);
+          }}
+          signInError={auth.authError}
+        />
       ) : effectivePage === "forecast-datas" ? (
         <ForecastDataPage
           forecast={data.forecast}
@@ -487,9 +534,21 @@ export default function App() {
 
       <Boot boot={data.boot} ready={data.ready} />
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onAuthed={() => undefined} />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onAuthed={() => undefined}
+        initialMethod={authInitialMethod}
+      />
 
-      <OperatorConsole open={operatorOpen} onClose={() => setOperatorOpen(false)} />
+      <OperatorConsole
+        open={operatorOpen}
+        onClose={() => setOperatorOpen(false)}
+        onOpenAuthorityLogin={() => {
+          setAuthInitialMethod("authority_code");
+          setAuthOpen(true);
+        }}
+      />
 
       {/* Progressive Gradual Blur Overlay at Website Bottom (GPU Optimized) */}
       <GradualBlur

@@ -112,6 +112,16 @@ export async function login(email: string, password: string): Promise<AuthUser> 
   return data.user;
 }
 
+export async function loginWithAuthorityCode(code: string, officerName?: string): Promise<AuthUser> {
+  const data = await authFetch<TokenPayload>("/api/v1/auth/authority-code-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: code.trim().toUpperCase(), officer_name: officerName?.trim() || undefined }),
+  });
+  persist(data.user, data.access_token);
+  return data.user;
+}
+
 export async function register(input: {
   email: string;
   password: string;
