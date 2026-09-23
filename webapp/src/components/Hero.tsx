@@ -255,7 +255,7 @@ export function Hero({
       />
 
       {/* ── WRAPPER ENCOMPASSING HEADER + CARD ── */}
-      <div className="relative w-full max-w-[1080px] flex flex-col gap-2 z-10">
+      <div className="relative w-full max-w-[1180px] flex flex-col gap-2 z-10">
         {/* ── 1. HEADER ROW (NOW OUTSIDE/ABOVE THE BOX AT THE PRECISE CUT LINE) ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 px-2 py-1">
           {/* Left: City Title & Subtitle */}
