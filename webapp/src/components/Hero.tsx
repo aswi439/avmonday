@@ -255,7 +255,7 @@ export function Hero({
       />
 
       {/* ── WRAPPER ENCOMPASSING HEADER + CARD ── */}
-      <div className="relative w-full max-w-[1340px] flex flex-col gap-3 z-10">
+      <div className="relative w-full max-w-[1080px] flex flex-col gap-2 z-10">
         {/* ── 1. HEADER ROW (NOW OUTSIDE/ABOVE THE BOX AT THE PRECISE CUT LINE) ── */}
         <div className="flex flex-wrap items-center justify-between gap-4 px-2 py-1">
           {/* Left: City Title & Subtitle */}
@@ -353,7 +353,7 @@ export function Hero({
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full rounded-[20px] overflow-hidden shadow-2xl p-6 sm:p-8 md:p-9 lg:p-10 transition-all duration-700 min-h-[350px] flex flex-col justify-between"
+          className="relative w-full rounded-[18px] overflow-hidden shadow-2xl p-4 sm:p-5 md:p-6 pb-3 sm:pb-3.5 md:pb-3.5 transition-all duration-700 flex flex-col justify-between"
           style={{
             background: isLight
               ? `linear-gradient(180deg, #FFFFFF 0%, color-mix(in srgb, ${categoryAccent} 10%, #F8FAFC) 55%, color-mix(in srgb, ${categoryAccent} 22%, #E2E8F0) 100%)`
@@ -369,7 +369,7 @@ export function Hero({
 
           {/* ── DELHI MONUMENTS SKYLINE SILHOUETTE ── */}
           <div
-            className={`absolute bottom-0 left-0 right-0 h-[115px] sm:h-[135px] md:h-[155px] pointer-events-none z-[1] overflow-hidden select-none transition-opacity ${isLight ? "opacity-20" : "opacity-45"}`}
+            className={`absolute bottom-0 left-0 right-0 h-[75px] sm:h-[90px] md:h-[105px] pointer-events-none z-[1] overflow-hidden select-none transition-opacity ${isLight ? "opacity-20" : "opacity-45"}`}
             aria-hidden="true"
           >
             <img
@@ -387,23 +387,23 @@ export function Hero({
             className="absolute z-[15] pointer-events-none transition-all duration-500 flex flex-col items-center"
             style={{
               left: "47%",
-              bottom: "74px",
+              bottom: "44px",
               transform: "translateX(-50%)",
             }}
             aria-hidden="true"
           >
             {/* Contact drop shadow on scale bar */}
-            <div className="w-20 h-2.5 rounded-[100%] bg-black/60 blur-[3.5px] absolute -bottom-0.5 left-1/2 -translate-x-1/2" />
+            <div className="w-16 h-2 rounded-[100%] bg-black/60 blur-[3px] absolute -bottom-0.5 left-1/2 -translate-x-1/2" />
 
             <img
               src={boyCharacter}
               alt="AQI Guide Character"
-              className="h-[170px] sm:h-[190px] md:h-[210px] w-auto object-contain drop-shadow-[0_14px_28px_rgba(0,0,0,0.65)]"
+              className="h-[130px] sm:h-[145px] md:h-[165px] w-auto object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.65)]"
             />
           </motion.div>
 
           {/* ── HERO BODY ROW: AQI METRIC STACK + WEATHER CARD ── */}
-          <div className="relative z-20 flex flex-wrap items-center justify-between gap-6 my-2">
+          <div className="relative z-20 flex flex-wrap items-center justify-between gap-4 my-0.5">
             {/* Left: AQI Metric Stack */}
             <div className="flex flex-col gap-2">
               {/* Live AQI status indicator pill */}
@@ -427,28 +427,28 @@ export function Hero({
               </div>
 
               {/* Large Numerical Display */}
-              <div className="flex items-baseline gap-4 mt-0.5">
+              <div className="flex items-baseline gap-3 mt-0.5">
                 <span
-                  className="text-[3.8rem] sm:text-[4.4rem] md:text-[4.8rem] font-[800] font-mono tracking-[-0.03em] leading-none"
+                  className="text-[3.1rem] sm:text-[3.6rem] md:text-[4rem] font-[800] font-mono tracking-[-0.03em] leading-none"
                   style={{
                     color: categoryAccent,
                     textShadow: isLight
-                      ? `0 0 30px ${categoryAccent}30, 0 2px 8px rgba(0,0,0,0.08)`
-                      : `0 0 45px ${categoryAccent}70, 0 3px 12px rgba(0,0,0,0.8)`,
+                      ? `0 0 25px ${categoryAccent}30, 0 2px 8px rgba(0,0,0,0.08)`
+                      : `0 0 35px ${categoryAccent}70, 0 3px 12px rgba(0,0,0,0.8)`,
                   }}
                 >
                   {int(displayAqi)}
                 </span>
-                <span className={`text-sm md:text-base font-semibold font-mono uppercase tracking-wider ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
+                <span className={`text-xs md:text-sm font-semibold font-mono uppercase tracking-wider ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
                   {scaleMode === "cpcb" ? "AQI (CPCB)" : "AQI (US EPA)"}
                 </span>
               </div>
 
               {/* Verdict line */}
-              <div className={`flex items-center gap-2.5 text-base md:text-lg font-medium mt-0.5 ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
+              <div className={`flex items-center gap-2 text-sm md:text-base font-medium mt-0.5 ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
                 <span>Air quality is</span>
                 <span
-                  className="px-3.5 py-0.5 rounded-full text-xs md:text-sm font-semibold tracking-wide border transition-all"
+                  className="px-3 py-0.5 rounded-full text-xs font-semibold tracking-wide border transition-all"
                   style={{
                     borderColor: categoryAccent,
                     color: categoryAccent,
@@ -461,7 +461,7 @@ export function Hero({
               </div>
 
               {/* Dominant Pollutant Caption */}
-              <p className={`text-xs md:text-sm font-mono mt-0.5 ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
+              <p className={`text-xs font-mono mt-0.5 ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
                 Dominant: <strong className={`font-bold ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>{dominantPollutant}</strong> ·{" "}
                 <span>{dominantConcentration} µg/m³</span>
               </p>
@@ -469,46 +469,46 @@ export function Hero({
 
             {/* Right: Glass Weather Card */}
             <div
-              className="rounded-[16px] p-4 sm:p-5 md:p-6 min-w-[250px] md:min-w-[280px] flex flex-col justify-between gap-3 backdrop-blur-md transition-transform hover:scale-[1.02]"
+              className="rounded-[14px] p-3 sm:p-3.5 md:p-4 min-w-[215px] md:min-w-[240px] flex flex-col justify-between gap-2 backdrop-blur-md transition-transform hover:scale-[1.02]"
               style={{
                 background: isLight ? "rgba(255, 255, 255, 0.85)" : "rgba(10, 11, 13, 0.42)",
                 border: `1px solid ${isLight ? "rgba(15, 23, 42, 0.1)" : "rgba(255, 255, 255, 0.08)"}`,
-                boxShadow: isLight ? "0 10px 25px rgba(15, 23, 42, 0.06)" : "0 12px 32px rgba(0, 0, 0, 0.35)",
+                boxShadow: isLight ? "0 8px 22px rgba(15, 23, 42, 0.06)" : "0 10px 28px rgba(0, 0, 0, 0.35)",
               }}
             >
               {/* Top row: Thermometer icon + large temperature */}
               <div className="flex items-center justify-between">
-                <span className={`inline-flex items-center gap-2.5 text-2xl md:text-3xl font-bold font-mono ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
-                  <Thermometer size={24} className="text-amber-500" />
+                <span className={`inline-flex items-center gap-2 text-xl md:text-2xl font-bold font-mono ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
+                  <Thermometer size={20} className="text-amber-500" />
                   {temperature} °C
                 </span>
-                <span className={`text-xs font-mono uppercase tracking-wider font-semibold ${isLight ? "text-slate-500" : "text-[#9aa3b2]"}`}>
+                <span className={`text-[11px] font-mono uppercase tracking-wider font-semibold ${isLight ? "text-slate-500" : "text-[#9aa3b2]"}`}>
                   Weather
                 </span>
               </div>
 
               {/* Middle: Condition label */}
-              <div className={`text-sm md:text-base font-semibold tracking-wide ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
+              <div className={`text-xs md:text-sm font-semibold tracking-wide ${isLight ? "text-slate-900" : "text-[#f2f4f8]"}`}>
                 {conditionLabel}
               </div>
 
               {/* Bottom row: Inline stat row with Lucide icons */}
-              <div className={`flex items-center justify-between gap-4 text-xs font-mono pt-2 border-t ${isLight ? "border-slate-200 text-slate-600" : "border-white/[0.08] text-[#9aa3b2]"}`}>
+              <div className={`flex items-center justify-between gap-3 text-[11px] font-mono pt-1.5 border-t ${isLight ? "border-slate-200 text-slate-600" : "border-white/[0.08] text-[#9aa3b2]"}`}>
                 {/* Humidity */}
-                <div className="flex items-center gap-1.5" title="Relative Humidity">
-                  <Droplets size={14} className="text-sky-500" />
+                <div className="flex items-center gap-1" title="Relative Humidity">
+                  <Droplets size={13} className="text-sky-500" />
                   <span>{humidity}%</span>
                 </div>
 
                 {/* Wind Speed */}
-                <div className="flex items-center gap-1.5" title="Wind Speed">
-                  <Wind size={14} className="text-teal-500" />
+                <div className="flex items-center gap-1" title="Wind Speed">
+                  <Wind size={13} className="text-teal-500" />
                   <span>{windSpeed} km/h</span>
                 </div>
 
                 {/* Precipitation */}
-                <div className="flex items-center gap-1.5" title="Precipitation">
-                  <CloudRain size={14} className="text-indigo-500" />
+                <div className="flex items-center gap-1" title="Precipitation">
+                  <CloudRain size={13} className="text-indigo-500" />
                   <span>{precip}</span>
                 </div>
               </div>
@@ -516,9 +516,9 @@ export function Hero({
           </div>
 
           {/* ── BOTTOM: AQI SEVERITY SCALE BAR ── */}
-          <div className="relative z-20 mt-6 pt-2">
+          <div className="relative z-20 mt-2.5 sm:mt-3 pt-0.5">
             {/* Labels row: Proportional category labels */}
-            <div className={`flex w-full text-xs md:text-sm font-mono font-medium mb-2.5 px-1 ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
+            <div className={`flex w-full text-[11px] md:text-xs font-mono font-medium mb-1.5 px-0.5 ${isLight ? "text-slate-600" : "text-[#9aa3b2]"}`}>
               {activeBands.map((band) => {
                 const isCurrent = band.name.toLowerCase() === categoryName.toLowerCase();
                 return (
@@ -542,7 +542,7 @@ export function Hero({
             </div>
 
             {/* Ramp bar: 8px tall track with 6 colored segments */}
-            <div className={`relative w-full h-[9px] rounded-full flex overflow-visible shadow-inner ${isLight ? "bg-slate-200/80" : "bg-black/60"}`}>
+            <div className={`relative w-full h-[8px] rounded-full flex overflow-visible shadow-inner ${isLight ? "bg-slate-200/80" : "bg-black/60"}`}>
               {activeBands.map((band, idx) => (
                 <div
                   key={band.name}
@@ -573,13 +573,13 @@ export function Hero({
                 className="flex flex-col items-center"
               >
                 {/* Floating dark pill with exact numeric score */}
-                <div className="mb-2.5 px-2.5 py-0.5 rounded-md bg-[#0a0b0d]/95 border border-white/20 text-[#f2f4f8] text-xs font-mono font-extrabold shadow-xl whitespace-nowrap">
+                <div className="mb-2 px-2 py-0.5 rounded-md bg-[#0a0b0d]/95 border border-white/20 text-[#f2f4f8] text-[11px] font-mono font-extrabold shadow-xl whitespace-nowrap">
                   {int(displayAqi)}
                 </div>
 
-                {/* 14px Indicator dot with double ring shadow */}
+                {/* 13px Indicator dot with double ring shadow */}
                 <div
-                  className="w-[14px] h-[14px] rounded-full bg-white border-2 border-[#0a0b0d]"
+                  className="w-[13px] h-[13px] rounded-full bg-white border-2 border-[#0a0b0d]"
                   style={{
                     boxShadow:
                       "0 0 0 2px rgba(255, 255, 255, 0.45), 0 2px 8px rgba(0, 0, 0, 0.85)",
@@ -589,7 +589,7 @@ export function Hero({
             </div>
 
             {/* Ticks row: Numeric cutoff labels */}
-            <div className="relative w-full text-[11px] md:text-xs font-mono text-[#9aa3b2] mt-2.5 h-5">
+            <div className="relative w-full text-[10px] md:text-[10.5px] font-mono text-[#9aa3b2] mt-1.5 h-4">
               <span className="absolute left-0 -translate-x-0">0</span>
               <span className="absolute left-[10%] -translate-x-1/2">50</span>
               <span className="absolute left-[20%] -translate-x-1/2">100</span>
